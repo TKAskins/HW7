@@ -1,0 +1,16 @@
+name: HW7_Environment
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - numpy
+  - pandas
+  - matplotlib
+  - statsmodels
+  - xarray
+  - scipy
+  - pip
+  - pip:
+    - hf-hydrodata
+    - herbie
