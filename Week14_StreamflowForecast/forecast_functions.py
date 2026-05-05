@@ -91,11 +91,63 @@ def fit_longterm_avg_model(train_df):
     """Return the mean streamflow (cfs) over the entire training period."""
     return float(train_df['streamflow_cfs'].mean())
 
+def fit_monthly_avg_model(train_df):
+    """Return the monthly mean streamflow (cfs) over the entire training period."""
+    return train_df.groupby(train_df.index.month)['streamflow_cfs'].mean().to_dict()
 
 def make_5day_forecast_longterm(mean_flow, forecast_date, n_days=5):
     """Return DataFrame with the long-term mean flow for every forecast day."""
     dates = pd.date_range(start=forecast_date, periods=n_days, freq='D')
     return pd.DataFrame({'Forecast_cfs': mean_flow}, index=dates)
+
+def make_5day_forecast_monthly(monthly_means, forecast_date, n_days=5):
+    """Return DataFrame with the long-term monthly mean flow for every forecast day."""
+    dates = pd.date_range(start=forecast_date, periods=n_days, freq='D')
+    return pd.DataFrame(
+        {'Forecast_cfs': [monthly_means[d.month] for d in dates]},
+        index=dates
+    )
+    return pd.DataFrame({'Forecast_cfs': mean_flow}, index=dates)
+
+
+def fit_trend_model(train_df, value_col='streamflow_cfs', n_recent=10):
+    """Fit a linear trend to the last n_recent points.
+
+    Returns a trend model containing slope, intercept, and the last training date.
+    """
+    if len(train_df) < n_recent:
+        raise ValueError(
+            f"train_df must contain at least {n_recent} rows to fit a trend line."
+        )
+
+    recent = train_df.iloc[-n_recent:]
+    x = np.arange(n_recent, dtype=float)
+    y = recent[value_col].astype(float).values
+    slope, intercept = np.polyfit(x, y, 1)
+
+    return {
+        'slope': float(slope),
+        'intercept': float(intercept),
+        'last_date': recent.index[-1],
+        'n_recent': n_recent
+    }
+
+
+def make_5day_forecast_trend(trend_model, start_date=None, n_days=5):
+    """Produce a 5-day trend forecast DataFrame from a fitted trend model."""
+    if start_date is None:
+        start_date = trend_model['last_date'] + pd.Timedelta(days=1)
+    else:
+        start_date = pd.to_datetime(start_date)
+
+    forecast_x = np.arange(trend_model['n_recent'], trend_model['n_recent'] + n_days, dtype=float)
+    forecast_values = trend_model['intercept'] + trend_model['slope'] * forecast_x
+    forecast_dates = pd.date_range(start=start_date, periods=n_days, freq='D')
+
+    return pd.DataFrame(
+        {'Forecast_cfs': forecast_values},
+        index=forecast_dates
+    )
 
 
 def compute_metrics(observed_cfs, predicted_cfs):
